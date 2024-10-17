@@ -6,6 +6,11 @@ exports.getCurrentUser = catchAsync(async (req, res, next) => {
 });
 
 exports.getCurrentUserGuilds = catchAsync(async (req, res, next) => {
-  const guilds = await fetchUserGuildsOauth(req.dbUser.accessToken);
-  res.json({ status: "success", data: guilds });
+  let guilds = await fetchUserGuildsOauth(req.dbUser.accessToken);
+
+  const ADMIN_BIT = 0x0000000000000008;
+
+  if(req.query.adminOnly == 'true') guilds= guilds.filter((g) => (g.permissions & ADMIN_BIT) == ADMIN_BIT)
+
+  res.json({ status: "success", data: { user: req.discordUser, guilds } });
 });
