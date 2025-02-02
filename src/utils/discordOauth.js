@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI } = process.env;
-
+const discordAPICache = new Map();
 const oauth2Options = {
   clientId: CLIENT_ID,
   clientSecret: CLIENT_SECRET,
@@ -40,6 +40,7 @@ exports.getAccessTokenFromCode = async (code) => {
   if (!res.access_token) throw new AppError("Something went wrong", 500);
   return res;
 };
+
 exports.getDiscordUserFromToken = async (accessToken) => {
   const res = await oauth.getUser(accessToken).catch((e) => e);
 
@@ -49,13 +50,25 @@ exports.getDiscordUserFromToken = async (accessToken) => {
   return res;
 };
 
-exports.fetchUserGuildsOauth = async (accessToken) => {
-  const res = await oauth.getUserGuilds(accessToken).catch((e) => e);
+exports.fetchUserGuildsOauth = async (accessToken, userId) => {
+  const apiResult = discordAPICache.get(userId);
 
-  if (res.code === 401)
-    throw new AppError("Could not get user guilds unauthorized", 401);
+  // Checking with apiResult?.discordUserGuilds because this code runs after every request when Oauth user is fetched so it can API result can be never be null
+  if (!apiResult.discordUserGuilds) {
+    console.log("Getting User Guilds from API");
 
-  return res;
+    const res = await oauth.getUserGuilds(accessToken).catch((e) => e);
+
+    if (res.code === 401)
+      throw new AppError("Could not get user guilds unauthorized", 401);
+
+    discordAPICache.set(userId, {
+      discordOauthUser: apiResult.discordOauthUser,
+      discordUserGuilds: [...res],
+    });
+  }
+
+  return discordAPICache.get(userId).discordUserGuilds;
 };
 
 exports.isLoggedIn = async (req) => {
@@ -82,10 +95,23 @@ exports.isLoggedIn = async (req) => {
       401
     );
 
-  const discordUser = await this.getDiscordUserFromToken(
-    currentUser.accessToken
-  );
+  const apiResult = discordAPICache.get(currentUser.userId);
+
+  // Not checking with apiResult?.discordOauthUser because this code runs before every request and it is 100% sure if cache was deleted the api result is null
+  if (!apiResult) {
+    console.log("Getting Oauth user from API");
+
+    const result = await this.getDiscordUserFromToken(currentUser.accessToken);
+
+    discordAPICache.set(currentUser.userId, {
+      discordOauthUser: { ...result },
+    });
+  }
 
   req.dbUser = currentUser;
-  req.discordUser = discordUser;
+  req.discordUser = discordAPICache.get(currentUser.userId).discordOauthUser;
 };
+
+setInterval(() => {
+  discordAPICache = new Map();
+}, 1000 * 60 * 15);
