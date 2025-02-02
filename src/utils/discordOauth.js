@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI } = process.env;
-const discordAPICache = new Map();
+let discordAPICache = new Map();
 const oauth2Options = {
   clientId: CLIENT_ID,
   clientSecret: CLIENT_SECRET,
