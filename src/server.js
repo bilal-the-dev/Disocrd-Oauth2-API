@@ -11,17 +11,10 @@ mongoose
   .catch(console.log);
 
 const server = app.listen(PORT, () => {
-  console.log(`Server is running at port ${PORT}`);
+  console.log(`Server is running at port http://localhost:${PORT}`);
 });
 
 // give some time to server to process requests before shutting down
-process.on("unhandledRejection", (err) => {
-  console.log("UNHANDLED REJECTION! 💥 Shutting down...");
-  console.log(err.name, err.message);
-  server.close(() => {
-    process.exit(1);
-  });
-});
 
 process.on("SIGTERM", () => {
   console.log("👋 SIGTERM RECEIVED. Shutting down gracefully");
